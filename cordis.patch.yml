@@ -1,0 +1,5 @@
+# dsh-plugin-prune — bundle patch: inserts the host row into the profile's
+# layer stack. The row is a pure observer service (no model tools).
+- insert:
+    - id: plugin-prune
+      name: 'dsh-plugin-prune'
