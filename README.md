@@ -15,11 +15,17 @@ business state. It:
   skill, the number of calls, error count, total/average dispatch duration,
   rendered output size, distinct using sessions, and per-day call counts
   (rolling 90-day window).
-- Adds a **「插件体检 / Plugin Health」** tab inside *Settings → Plugins* with
-  a table of all registered tools and used skills, machine suggestions
-  (**never called — likely a dead plugin, consider removing** / high error
-  rate / marked useless / active and reliable), and a one-click
-  **有用 / 一般 / 无用** value rating per row.
+- Adds a **「插件体检 / Plugin Health」** tab inside *Settings → Plugins* with:
+  - a **plugin overview table** joined with the shipped plugin inventory
+    (`pluginInventory` Remote): status (ok/disabled/failed), contributed tool
+    counts and real call statistics per installed plugin — flagging the
+    never-used / failed / marked-useless ones, i.e. the direct answer to
+    "which plugins can I remove";
+  - a **tool/skill detail table**: calls, 7-day activity, error rate, average
+    latency, last use, sessions, output size, machine suggestions
+    (**never called — likely a dead plugin, consider removing** / high error
+    rate / marked useless / active and reliable), and a one-click
+    **Useful / Neutral / Useless** value rating per row.
 - Persists the statistics as JSON at `$DSH_HOME/dsh-plugin-prune.json`
   (falls back to `~/.dsh/dsh-plugin-prune.json`), so counts accumulate across
   restarts.
