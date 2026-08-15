@@ -14,6 +14,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
+import { USAGE_DESCRIPTORS } from './remote-descriptors.ts'
 import { StatsStore, resolveDataPath } from './stats.ts'
 import type { ToolExecLike } from './stats.ts'
 import type { UsageRateRequest, UsageReport } from './types.ts'
@@ -51,8 +52,27 @@ interface ObserverContext {
   effect(callback: () => unknown | (() => unknown), label?: string): unknown
 }
 
+/** Structural surface of the typert registry this service contributes to. */
+interface TypertLike {
+  readonly local: { get(endpoint: string): unknown }
+  register(contribution: {
+    package: string
+    face: 'host'
+    schemas: readonly unknown[]
+    model: { services: readonly unknown[], events: readonly unknown[], objects: readonly unknown[] }
+    invocations: readonly unknown[]
+  }): () => unknown
+}
+
 export class PluginUsageService extends TypertRemoteService {
-  static inject: string[] = []
+  /**
+   * Both services are hard dependencies, declared the standard way: cordis
+   * delivers them to the row's (possibly scoped) context, whereas `ctx.get`
+   * only resolves services provided in the same scope. `typert` carries the
+   * strict invocation contribution; `tools` supplies the registry snapshot
+   * and the late-registration attribution hook.
+   */
+  static inject = ['typert', 'tools']
 
   private readonly stats: StatsStore
   private readonly ctxAsObserver: ObserverContext
@@ -82,8 +102,8 @@ export class PluginUsageService extends TypertRemoteService {
       }
     }) as (...args: never[]) => unknown)
 
-    const tools = ctx.get('tools') as ToolsLike | null | undefined
-    if (tools !== null && tools !== undefined) {
+    const tools = (ctx as unknown as { tools: ToolsLike | undefined }).tools
+    if (tools !== undefined) {
       try {
         if (typeof tools.schemas === 'function') {
           const schemas = tools.schemas()
@@ -100,7 +120,49 @@ export class PluginUsageService extends TypertRemoteService {
       }
     }
 
+    const typertDiag = this.registerTypertContribution(ctx)
+    this.stats.writeDiagnostic({ toolsFound: tools !== undefined, ...typertDiag })
+
     ctx.effect(() => () => this.stats.dispose())
+  }
+
+  /**
+   * Register strict invocation descriptors so the api-gateway claims and
+   * dispatches `pluginUsage/*` through its generated local registry. This is
+   * more robust than relying on `@Remote` markers alone: marker storage is a
+   * module-local WeakMap that splits when the profile resolves a second copy
+   * of `dsh-typert-protocol` beside the deployment's own.
+   */
+  private registerTypertContribution(ctx: Context): Record<string, unknown> {
+    try {
+      const typert = (ctx as unknown as { typert: TypertLike | undefined }).typert
+      if (typert === undefined || typeof typert.register !== 'function') {
+        return { typertFound: false, contributionError: null, endpointRegistered: false }
+      }
+      const disposer = typert.register({
+        package: 'dsh-plugin-prune',
+        face: 'host',
+        schemas: [],
+        model: { services: [], events: [], objects: [] },
+        invocations: USAGE_DESCRIPTORS,
+      })
+      const endpointRegistered = typert.local.get('pluginUsage/report') !== undefined
+      ctx.effect(() => () => {
+        try {
+          disposer()
+        } catch {
+          // Already withdrawn with the fiber.
+        }
+      }, 'dsh-plugin-prune: typert contribution')
+      return { typertFound: true, contributionError: null, endpointRegistered }
+    } catch (error) {
+      console.error('[dsh-plugin-prune] typert registration failed:', error instanceof Error ? error.message : String(error))
+      return {
+        typertFound: true,
+        contributionError: error instanceof Error ? error.message : String(error),
+        endpointRegistered: false,
+      }
+    }
   }
 
   /** Read the aggregated report. */
@@ -121,14 +183,17 @@ export class PluginUsageService extends TypertRemoteService {
     return this.stats.reset()
   }
 
-  /** Attribute tools registered after this plugin activated, via their stack frames. */
+  /** Track tools registered after this plugin activated (all scopes), via their stack frames. */
   private wrapToolsRegister(tools: ToolsLike): void {
     const original = tools.register
     const stats = this.stats
     tools.register = function (this: unknown, definition: { name?: unknown }) {
       try {
         const name = definition?.name
-        if (typeof name === 'string' && name !== '') stats.attributeRegister(name, new Error().stack)
+        if (typeof name === 'string' && name !== '') {
+          stats.addRegistered(name)
+          stats.attributeRegister(name, new Error().stack)
+        }
       } catch {
         // Best-effort attribution only.
       }

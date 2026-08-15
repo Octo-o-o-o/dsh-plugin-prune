@@ -123,6 +123,11 @@ export class StatsStore {
     this.registeredNames = [...names]
   }
 
+  /** Record one tool name seen by the register hook (any scope), deduplicated. */
+  addRegistered(name: string): void {
+    if (!this.registeredNames.includes(name)) this.registeredNames.push(name)
+  }
+
   /** Attribute one newly registered tool from its registration stack. */
   attributeRegister(name: string, stack: string | undefined): void {
     if (this.sources[name] !== undefined) return
@@ -263,6 +268,16 @@ export class StatsStore {
     this.sessionSets.clear()
     this.persistNow()
     return this.report()
+  }
+
+  /** Best-effort diagnostic dump beside the data file (runtime probes). */
+  writeDiagnostic(diag: Record<string, unknown>): void {
+    try {
+      mkdirSync(dirname(this.dataPath), { recursive: true })
+      writeFileSync(`${this.dataPath}.diag.json`, JSON.stringify({ at: this.iso(), ...diag }))
+    } catch {
+      // Diagnostics must never break the service.
+    }
   }
 
   /** Flush pending state; called on service dispose. */

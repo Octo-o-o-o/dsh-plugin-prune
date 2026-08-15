@@ -20,8 +20,29 @@ const registry = {
 }
 ctx.provide('tools', registry)
 
+// Provide a fake typert registry to capture the host contribution.
+let typertContribution = null
+ctx.provide('typert', {
+  register(contribution) {
+    typertContribution = contribution
+    return () => {}
+  },
+})
+
 const service = new PluginUsageService(ctx, { dataPath, debounceMs: 100 })
 assert.equal(service.name, 'pluginUsage')
+
+// --- host typert contribution (gateway claim path) ---
+assert.ok(typertContribution !== null, 'service must register a typert contribution')
+assert.equal(typertContribution.package, 'dsh-plugin-prune')
+assert.equal(typertContribution.face, 'host')
+assert.equal(typertContribution.invocations.length, 3)
+const rateInvocation = typertContribution.invocations.find(i => i.method === 'rate')
+assert.equal(rateInvocation.namespace, 'pluginUsage')
+assert.equal(rateInvocation.service, 'pluginUsage')
+assert.equal(rateInvocation.parameters[0].wire, 'request')
+assert.equal(rateInvocation.parameters[0].codec.mode, 'strict')
+assert.equal(rateInvocation.result.mode, 'strict')
 
 // --- simulate the tool pipeline ---
 ctx.emit('tools/execute', { callId: 'c1', name: 'bash' }, () => 'next-marker')
