@@ -1,0 +1,139 @@
+.panel {
+  padding: 2px 0 12px;
+  font-size: 13px;
+}
+
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.panel h4 {
+  margin: 14px 0 8px;
+  font-size: 13px;
+}
+
+.meta {
+  color: var(--text-muted, #8b949e);
+  margin-bottom: 10px;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.4));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.checkboxLabel {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  white-space: nowrap;
+}
+
+.name {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.4));
+  color: var(--text-muted, #8b949e);
+}
+
+.pkg {
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  word-break: break-all;
+  max-width: 220px;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rating {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.rateBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.4));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.onGood {
+  background: rgba(46, 160, 67, 0.18);
+  border-color: rgba(46, 160, 67, 0.55);
+}
+
+.onBad {
+  background: rgba(248, 81, 73, 0.18);
+  border-color: rgba(248, 81, 73, 0.55);
+}
+
+.hint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.6;
+}
+
+.suggestWarn {
+  color: var(--danger, #f85149);
+}
+
+.suggestOk {
+  color: var(--success, #3fb950);
+}
