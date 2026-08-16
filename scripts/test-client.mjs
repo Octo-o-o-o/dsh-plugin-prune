@@ -2,8 +2,9 @@
  * Client functional test against the BUILT bundle (client/client.js):
  * stubs window.__ModuleLoader__, executes the factory with the real
  * react / react/jsx-runtime externals, and drives apply() with fake
- * slots/locale/remote services. Verifies the loader id, the slot
- * registration, the Remote $mount contribution, and the panel element.
+ * slots/locale/connection services. Verifies the loader id, the slot
+ * registration, the connection-RPC wiring (endpoints + payloads), the
+ * plugin overview aggregation, and the panel element.
  */
 import { strict as assert } from 'node:assert'
 import { createRequire } from 'node:module'
@@ -31,30 +32,35 @@ const stubRequire = (id) => {
 const mod = factory(stubRequire)
 
 assert.equal(mod.name, 'dsh-plugin-prune')
-assert.deepEqual(mod.inject, ['slots', 'locale', 'remote'])
+assert.deepEqual(mod.inject, ['slots', 'locale', 'connection'])
 assert.equal(typeof mod.apply, 'function')
+assert.equal(typeof mod.createUsageClient, 'function')
 
 // --- drive apply() with fake services ---
 const effects = []
-let mountContribution = null
 let injectSlot = null
 let injectCallback = null
 let registration = null
 
-const inventoryRemote = { list: async () => ({ ok: true, value: { entries: [] } }) }
-let inventoryLookup = 0
+const rpcCalls = []
+const connection = {
+  call: async (channel, endpoint, payload) => {
+    rpcCalls.push({ channel, endpoint, payload })
+    if (endpoint === 'pluginUsage/report') {
+      return { ok: true, value: { trackedSince: 'now', registeredTools: 0, usedTools: 0, registered: [], entries: [] } }
+    }
+    if (endpoint === 'pluginInventory/list') {
+      return { ok: true, value: { entries: [] } }
+    }
+    if (endpoint === 'pluginUsage/rate' || endpoint === 'pluginUsage/reset') {
+      return { ok: true, value: endpoint === 'pluginUsage/rate' ? { ok: true } : { trackedSince: 'now', registeredTools: 0, usedTools: 0, registered: [], entries: [] } }
+    }
+    return { ok: false, error: { message: 'unexpected endpoint: ' + endpoint } }
+  },
+}
 
 const ctx = {
-  get(name) {
-    if (name === 'remote') {
-      return { $mount: async (contribution) => { mountContribution = contribution; return () => {} } }
-    }
-    if (name === 'remote.pluginInventory') {
-      inventoryLookup += 1
-      return inventoryRemote
-    }
-    return undefined
-  },
+  connection,
   effect(callback, label) { effects.push([callback, label]); return () => {} },
   locale: {
     register(namespace, dicts) { effects.push(['dict', namespace, dicts]); return () => {} },
@@ -79,26 +85,41 @@ assert.equal(registration.meta.order, 20)
 assert.equal(typeof registration.meta.label, 'function')
 assert.equal(registration.meta.locale, 'dsh-plugin-prune')
 
-assert.ok(mountContribution !== null, 'remote $mount must receive the contribution')
-assert.equal(mountContribution.package, 'dsh-plugin-prune')
-assert.equal(mountContribution.descriptors.length, 3)
-const methods = mountContribution.descriptors.map(d => d.method).sort()
-assert.deepEqual(methods, ['rate', 'report', 'reset'])
-const rate = mountContribution.descriptors.find(d => d.method === 'rate')
-assert.equal(rate.namespace, 'pluginUsage')
-assert.equal(rate.service, 'pluginUsage')
-assert.equal(rate.parameters.length, 1)
-assert.equal(rate.parameters[0].wire, 'request')
-assert.equal(rate.parameters[0].codec.mode, 'strict')
-assert.equal(rate.result.mode, 'strict')
-
-// --- render the panel element ---
+// --- connection-RPC wiring through the typed facade ---
 const element = registration.component()
 assert.equal(typeof element.type, 'function')
-assert.ok(element.props.remote instanceof Promise)
 assert.equal(element.props.t('tab'), 't(tab)')
-assert.equal(element.props.inventory, inventoryRemote)
-assert.equal(inventoryLookup, 1, 'inventory namespace resolved once at apply')
+const client = element.props.client
+assert.ok(client !== null && typeof client === 'object')
+
+const reportOutcome = await client.report()
+assert.equal(reportOutcome.ok, true)
+assert.equal(rpcCalls.length, 1)
+assert.equal(rpcCalls[0].channel, '/api')
+assert.equal(rpcCalls[0].endpoint, 'pluginUsage/report')
+assert.deepEqual(rpcCalls[0].payload, { args: {} })
+
+const rateOutcome = await client.rate({ key: 'bash', rating: 'useful' })
+assert.equal(rateOutcome.ok, true)
+assert.equal(rpcCalls[1].endpoint, 'pluginUsage/rate')
+assert.deepEqual(rpcCalls[1].payload, { args: { request: { key: 'bash', rating: 'useful' } } })
+
+const invOutcome = await client.inventory()
+assert.equal(invOutcome.ok, true)
+assert.equal(rpcCalls[2].endpoint, 'pluginInventory/list')
+assert.deepEqual(rpcCalls[2].payload, { args: {} })
+
+const resetOutcome = await client.reset()
+assert.equal(resetOutcome.ok, true)
+assert.equal(rpcCalls[3].endpoint, 'pluginUsage/reset')
+
+// --- error branch ---
+const failing = mod.createUsageClient({
+  call: async () => ({ ok: false, error: { message: 'boom' } }),
+})
+const failed = await failing.report()
+assert.equal(failed.ok, false)
+assert.equal(failed.message, 'boom')
 
 // --- plugin overview aggregation (pure, exported through the bundle) ---
 assert.equal(typeof mod.buildPluginRows, 'function')

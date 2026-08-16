@@ -3,3 +3,4 @@ lib/
 client/
 *.log
 .DS_Store
+*.tgz

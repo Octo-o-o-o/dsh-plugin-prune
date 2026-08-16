@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-prune",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Prune dead plugins in DeepSeek Harness: measures the real usage of every plugin's tools and skills (calls, error rate, latency, sessions) plus your value ratings, and flags the plugins you can safely remove. · 死插件修剪器：统计每个插件工具/技能的真实使用（调用、错误率、耗时、跨会话）与你的价值评分，标出哪些插件可以安全移除。",
   "license": "MIT",
   "type": "module",
@@ -38,8 +38,8 @@
     },
     "client": {
       "inject": [
+        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings"
       ],
